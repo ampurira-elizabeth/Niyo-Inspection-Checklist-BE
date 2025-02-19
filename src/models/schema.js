@@ -25,8 +25,12 @@ const createTables = async () => {
             CREATE TABLE IF NOT EXISTS inspections (
                 id INT PRIMARY KEY AUTO_INCREMENT,
                 date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                garage_name VARCHAR(255),
+                contact_person_tel VARCHAR(255), 
+                physical_location VARCHAR(255),
                 total_score DECIMAL(5,2),
                 percentage DECIMAL(5,2)
+               
             )
         `);
 

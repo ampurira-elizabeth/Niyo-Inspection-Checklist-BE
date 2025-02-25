@@ -161,18 +161,17 @@ router.post('/submit', async (req, res) => {
                     [inspectionId, item.checklistItemId, item.status, score, item.comments]
                 );
             } else {
-                console.error("Invalid item data:", item); // Log invalid items for debugging
+                console.error("Invalid item data:", item); 
             }
         
 
             totalScore += score;
-            totalPossibleScore++; // Maximum possible score per item
+            totalPossibleScore++; 
         }
 
         // Calculate percentage
         const percentage = (totalScore / totalPossibleScore) * 100;
 
-        // Update inspection with final scores
         await db.query(
             'UPDATE inspections SET total_score = ?, percentage = ? WHERE id = ?',
             [totalScore, percentage, inspectionId]
@@ -191,6 +190,82 @@ router.post('/submit', async (req, res) => {
         await db.query('ROLLBACK');
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Get inspections with results
+
+
+router.get('/inspections', async (req, res) => {
+    try {
+        const [inspections] = await db.query(`
+            SELECT id, date, garage_name, contact_person_tel, physical_location, total_score, percentage
+            FROM inspections
+        `);
+        
+        // Convert any Buffer objects to strings
+        const processedInspections = inspections.map(row => {
+            const processedRow = {};
+            for (const [key, value] of Object.entries(row)) {
+                processedRow[key] = value instanceof Buffer ? value.toString() : value;
+            }
+            return processedRow;
+        });
+        
+        res.json(processedInspections);
+    } catch (error) {
+        console.error('Error fetching inspections:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.get('/inspections/pdf', async (req, res) => {
+    try {
+        // Fetch all inspections
+        const inspections = await db.query(`
+            SELECT id, date, garage_name, contact_person_tel, physical_location, total_score, percentage
+            FROM inspections
+        `);
+
+        // Create a PDF document
+        const doc = new PDFDocument();
+        const filePath = path.join(__dirname, 'inspections.pdf');
+
+        // Pipe the PDF into a writable stream
+        doc.pipe(fs.createWriteStream(filePath));
+
+        // Add a header to the PDF
+        doc.fontSize(20).text('Inspections Report', { align: 'center' });
+        doc.moveDown();
+
+        // Add inspection data to the PDF
+        inspections.forEach(inspection => {
+            doc.fontSize(12).text(`ID: ${inspection.id}`);
+            doc.text(`Date: ${inspection.date}`);
+            doc.text(`Garage Name: ${inspection.garage_name}`);
+            doc.text(`Contact Person: ${inspection.contact_person_tel}`);
+            doc.text(`Physical Location: ${inspection.physical_location}`);
+            doc.text(`Total Score: ${inspection.total_score}`);
+            doc.text(`Percentage: ${inspection.percentage.toFixed(2)}%`);
+            doc.moveDown();
+            doc.moveDown(); // Add extra space between inspections
+        });
+
+        // Finalize the PDF and end the stream
+        doc.end();
+
+        // Send the generated PDF as a response
+        res.download(filePath, 'inspections.pdf', (err) => {
+            if (err) {
+                console.error('Error downloading the file:', err);
+                res.status(500).send('Error downloading the file.');
+            }
+            // Optionally, delete the file after sending it
+            fs.unlinkSync(filePath);
+        });
+    } catch (error) {
+        console.error('Error generating PDF:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 

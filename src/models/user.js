@@ -48,19 +48,13 @@ const findById = async (id) => {
 const create = async (userData) => {
   try {
     const { name, email, password } = userData;
-    
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
+        const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    
-    // Insert user
-    const [result] = await promisePool.execute(
+        const [result] = await promisePool.execute(
       'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
       [name, email, hashedPassword]
     );
-    
-    // Get created user (excluding password)
-    const [rows] = await promisePool.execute(
+        const [rows] = await promisePool.execute(
       'SELECT id, name, email, created_at FROM users WHERE id = ?',
       [result.insertId]
     );

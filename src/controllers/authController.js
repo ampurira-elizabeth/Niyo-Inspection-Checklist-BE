@@ -54,8 +54,6 @@ exports.login = async (req, res) => {
         error: 'Please provide email and password'
       });
     }
-
-    // Check for user
     const user = await User.findByEmail(email);
     if (!user) {
       return res.status(401).json({
@@ -72,11 +70,7 @@ exports.login = async (req, res) => {
         error: 'Invalid credentials'
       });
     }
-
-    // Create and send token
     const token = User.generateToken(user.id);
-
-    // Don't return password
     const { password: _, ...userData } = user;
 
     return res.status(200).json({
@@ -117,5 +111,15 @@ exports.getMe = async (req, res) => {
       success: false,
       error: 'Server error'
     });
+  }
+};
+
+
+exports.logoutUser = async(req, res) => {
+  try {
+      // Clear the token from client-side (handled in frontend)
+      res.status(200).json({ message: "Logout successful." });
+  } catch (error) {
+      res.status(500).json({ error: "Logout failed. Please try again." });
   }
 };

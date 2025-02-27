@@ -14,4 +14,29 @@ const pool = mysql.createPool({
 // Convert pool to use promises
 const promisePool = pool.promise();
 
-module.exports = promisePool;
+const testConnection = async () => {
+    try {
+      const connection = await promisePool.getConnection();
+      console.log('Connected to MySQL database');
+      connection.release();
+      return true;
+    } catch (error) {
+      console.error('Error connecting to MySQL:', error);
+      return false;
+    }
+  };
+
+module.exports = {
+    promisePool,
+    testConnection,
+    query: async (sql, params) => {
+        try {
+            const [rows, fields] = await promisePool.execute(sql, params || []);
+            return rows;
+        } catch (error) {
+            console.error('Database query error:', error);
+            throw error;
+        }
+    }
+};
+// module.exports = {promisePool,testConnection};

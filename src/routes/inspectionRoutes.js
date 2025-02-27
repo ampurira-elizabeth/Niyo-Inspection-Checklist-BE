@@ -6,8 +6,8 @@ const PDFDocument = require("pdfkit");
 // Get all categories with their checklist items
 router.get("/categories", async (req, res) => {
   try {
-    const [categories] = await db.query("SELECT * FROM categories");
-    const [items] = await db.query(`
+    const categories = await db.query("SELECT * FROM categories");
+    const items = await db.query(`
             SELECT ci.*, c.name as category_name 
             FROM checklist_items ci 
             JOIN categories c ON ci.category_id = c.id
@@ -137,10 +137,11 @@ router.post("/submit", async (req, res) => {
       req.body;
 
     // Start transaction
-    await db.query("START TRANSACTION");
-
+    // await db.query("START TRANSACTION");
+    const connection = await db.promisePool.getConnection(); 
+    await connection.beginTransaction();
     // Create new inspection with additional fields
-    const [inspection] = await db.query(
+    const [inspection] = await connection.query(
       "INSERT INTO inspections (date, garage_name, contact_person_tel, physical_location) VALUES (NOW(), ?, ?, ?)",
       [garage_name, contact_person_tel, physical_location]
     );
@@ -165,7 +166,7 @@ router.post("/submit", async (req, res) => {
       }
 
       if (item.checklistItemId !== undefined && item.status) {
-        await db.query(
+        await connection.query(
           `INSERT INTO inspection_results 
                     (inspection_id, checklist_item_id, status, score, comments) 
                     VALUES (?, ?, ?, ?, ?)`,
@@ -188,14 +189,15 @@ router.post("/submit", async (req, res) => {
     // Calculate percentage
     const percentage = (totalScore / totalPossibleScore) * 100;
 
-    await db.query(
+    await connection.query(
       "UPDATE inspections SET total_score = ?, percentage = ? WHERE id = ?",
       [totalScore, percentage, inspectionId]
     );
 
     // Commit transaction
-    await db.query("COMMIT");
-
+    // await db.query("COMMIT");
+    await connection.commit();
+    connection.release();
     res.json({
       success: true,
       inspectionId,
@@ -203,7 +205,9 @@ router.post("/submit", async (req, res) => {
       percentage,
     });
   } catch (error) {
-    await db.query("ROLLBACK");
+    // await db.query("ROLLBACK");
+    await connection.rollback();
+    connection.release();
     console.error(error);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -213,7 +217,7 @@ router.post("/submit", async (req, res) => {
 
 router.get("/inspections", async (req, res) => {
   try {
-    const [inspections] = await db.query(`
+    const inspections = await db.query(`
             SELECT id, date, garage_name, contact_person_tel, physical_location, total_score, percentage
             FROM inspections
         `);
